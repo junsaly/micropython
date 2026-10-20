@@ -1,0 +1,15 @@
+{
+    "deploy": [
+        "../deploy.md"
+    ],
+    "docs": "",
+    "features": [],
+    "images": [
+        "nucleo_f411re.jpg"
+    ],
+    "mcu": "stm32f2",
+    "product": "CMG2 ",
+    "thumbnail": "",
+    "url": "",
+    "vendor": "ST Microelectronics"
+}
