@@ -34,10 +34,7 @@
 #include "pico/unique_id.h"
 
 void mp_usbd_port_get_serial_number(char *serial_buf) {
-    pico_unique_board_id_t id;
-    pico_get_unique_board_id(&id);
-    MP_STATIC_ASSERT(sizeof(id.id) * 2 <= MICROPY_HW_USB_DESC_STR_MAX);
-    mp_usbd_hex_str(serial_buf, id.id, sizeof(id.id));
+    strcpy(serial_buf, "Pico2");
 }
 
 #endif
