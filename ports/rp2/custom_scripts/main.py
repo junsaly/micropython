@@ -1,67 +1,80 @@
-# Pico2 入口：启动 MIX RPC Server (USB CDC 串口)
-# 协议: MIX_2.0 JSON-RPC, 一行一个请求, 换行分隔
+# Pico2 入口: 读 confighw_profile.json 装配驱动并启动 RPC Server
+# 协议: MIX_2.0 JSON-RPC, USB CDC 串口, 一行一个请求
 
 import sys
+import json
 
+# APP 目录挂到 sys.path, 使 "import app.rpc.server" 可用
 sys.path.insert(0, '/APP')
 
-from rpc.server.server import RPCServer
-from rpc.services.picoservice import PicoService
-
-# DMM 服务：无硬件时用 mock ADC 验证 RPC 链路
-try:
-    from rpc.services.dmm.dmm import DMMService
-    dmm_ok = True
-except Exception:
-    dmm_ok = False
+from app.rpc.server import RPCServer
+from app.driver.ic.ad7175 import PLAD7175
+from app.driver.module.dmm import PRM_DMM, MockAD7175
 
 
-class MockAD7175(object):
-    '''无硬件时模拟 AD7175，用于验证 RPC 调用链路'''
-    def reset(self):
-        pass
+# ---------- 配置装配 (对齐 STM32 launcher 思路) ----------
 
-    def read_volt(self, channel, timeout_sec=2):
-        return round(1234.567, 3)
+def create_shared_devices(profile):
+    '''创建 shared_devices 中的实例, 支持 @引用'''
+    devices = {}
+    shared = profile.get('shared_devices', {})
+    for name, cfg in shared.items():
+        obj = None
+        cls = cfg.get('class')
+        if cls == 'PLAD7175':
+            if cfg.get('mock', False):
+                obj = MockAD7175()
+            else:
+                obj = PLAD7175(
+                    sck=cfg.get('sck'), mosi=cfg.get('mosi'),
+                    miso=cfg.get('miso'), cs=cfg.get('cs'),
+                    freq=cfg.get('freq', 5000000),
+                    mvref=cfg.get('mvref', 5000))
+        devices[name] = obj
+    return devices
 
-    def set_sampling_rate(self, channel, rate):
-        self._rate = rate
 
-    def get_sampling_rate(self, channel):
-        return getattr(self, '_rate', 5000)
+def resolve_ref(value, devices):
+    '''@xxx 引用解析'''
+    if isinstance(value, str) and value.startswith('@'):
+        return devices.get(value[1:])
+    return value
 
-    def set_channel_state(self, channel, state):
-        pass
 
-    def select_single_channel(self, channel):
-        pass
+def create_dut_instances(profile, devices):
+    '''创建 dut 实例 dict, 返回 {实例名: 对象}'''
+    objs = {}
+    for dut in profile.get('duts', {}).values():
+        for name, cfg in dut.items():
+            if not isinstance(cfg, dict) or 'class' not in cfg:
+                continue
+            cls = cfg['class']
+            if cls == 'PRM_DMM':
+                adc = resolve_ref(cfg.get('ad7175'), devices)
+                objs[name] = PRM_DMM(ad7175=adc)
+    return objs
 
-    def is_communication_ok(self):
-        return True
 
-    def config_max_value_measure(self, channel, samples):
-        pass
-
-    def enable_continuous_sampling(self, channel, rate, samples=1):
-        pass
-
-    def disable_continuous_sampling(self, channel):
-        pass
-
-    def get_continuous_sampling_voltage(self, channel, count):
-        return [1234.567] * count
-
+# ---------- 主流程 ----------
 
 def main():
-    server = RPCServer(identity='pico')
-    server.register('pico', PicoService())
+    # 读配置
+    try:
+        with open('/APP/app/confighw_profile.json', 'r') as f:
+            profile = json.load(f)
+    except Exception as e:
+        print('config load failed: {0}'.format(e))
+        profile = {}
 
-    if dmm_ok:
-        server.register('dmm', DMMService(adc=MockAD7175()))
-        print('DMM service registered (mock mode)')
-    else:
-        print('DMM service load failed')
+    # 装配
+    shared = create_shared_devices(profile)
+    dut_objs = create_dut_instances(profile, shared)
 
+    # 启动 RPC Server 并注册实例 (方法名: "dmm.measure")
+    server = RPCServer()
+    server.register_instance(dut_objs)
+
+    print('registered methods: {0}'.format(json.dumps(server.all_methods())))
     server.run()
 
 

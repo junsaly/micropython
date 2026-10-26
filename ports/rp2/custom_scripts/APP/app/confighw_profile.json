@@ -1,0 +1,26 @@
+{
+	"shared_devices": {
+		"ad7175_spi": {
+			"class": "PLAD7175",
+			"sck": 2,
+			"mosi": 3,
+			"miso": 4,
+			"cs": 5,
+			"freq": 5000000,
+			"mvref": 5000,
+			"mock": true
+		}
+	},
+	"duts": {
+		"dut0": {
+			"dmm": {
+				"class": "PRM_DMM",
+				"ad7175": "@ad7175_spi"
+			},
+			"site": 0,
+			"server": {
+				"port": 7801
+			}
+		}
+	}
+}
