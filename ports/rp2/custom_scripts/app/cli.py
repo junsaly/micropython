@@ -5,17 +5,18 @@
 
 import sys
 import machine
+import select
 
 
 class Shell(object):
     PROMPT = 'pico> '
 
-    # 补全树: 前缀匹配, 叶节点为完整指令/参数
+    # 补全树: 前缀匹配, 叶节点为完整指令/参数; '#' 表示任意数字(pin 号)
     COMPLETE_TREE = {
         'help': {},
         'run': {'rpc': {}},
-        'set': {'io': {'high': {}, 'low': {}}},
-        'get': {'io': {}},
+        'set': {'io': {'#': {'high': {}, 'low': {}}}},
+        'get': {'io': {'#': {}}},
         'eval': {},
         'reboot': {},
     }
@@ -24,6 +25,8 @@ class Shell(object):
         self._ctx = context or {}      # eval 时可见的符号表
         self._on_run_rpc = on_run_rpc  # run rpc 回调(重新进入 RPC 循环)
         self._line = ''
+        self._history = []             # 指令历史 (方向键上/下回放)
+        self._hist_idx = 0
 
     # ---------- 指令实现 ----------
     def _cmd_help(self, args):
@@ -116,6 +119,8 @@ class Shell(object):
             if not t:
                 continue
             nxt = node.get(t)
+            if nxt is None and '#' in node and t.isdigit():
+                nxt = node['#']  # 数字 pin 号通配
             if nxt is None:
                 sys.stdout.write('\x07')  # 中间 token 无法匹配
                 return
@@ -132,6 +137,25 @@ class Shell(object):
             sys.stdout.write('\r\n' + Shell.PROMPT + self._line)
         else:
             sys.stdout.write('\x07')
+
+    # ---------- 历史 ----------
+    def _redraw_line(self, text):
+        '''用新内容重绘当前行 (清行 + 提示符 + 文本)'''
+        self._line = text
+        sys.stdout.write('\r\x1b[K' + Shell.PROMPT + text)
+
+    def _hist_up(self):
+        if self._history and self._hist_idx > 0:
+            self._hist_idx -= 1
+            self._redraw_line(self._history[self._hist_idx])
+
+    def _hist_down(self):
+        if self._hist_idx < len(self._history):
+            self._hist_idx += 1
+            if self._hist_idx == len(self._history):
+                self._redraw_line('')
+            else:
+                self._redraw_line(self._history[self._hist_idx])
 
     # ---------- 主循环 ----------
     def _prompt(self):
@@ -153,8 +177,11 @@ class Shell(object):
                 sys.stdout.write('\r\n')
                 cmd = self._line.strip()
                 self._line = ''
-                if cmd and self._execute(cmd) == 'exit':
-                    return
+                if cmd:
+                    self._history.append(cmd)
+                    self._hist_idx = len(self._history)
+                    if self._execute(cmd) == 'exit':
+                        return
                 self._prompt()
             elif o == 8 or o == 127:   # backspace
                 if self._line:
@@ -162,6 +189,23 @@ class Shell(object):
                     sys.stdout.write('\b \b')
             elif o == 9:          # Tab -> complete
                 self._complete()
+            elif o == 27:         # ESC: 方向键序列 \x1b[A / \x1b[B
+                self._arrow_key()
             elif 32 <= o <= 126:
                 self._line += c
                 sys.stdout.write(c)
+
+    def _arrow_key(self):
+        '''读取 ESC 后的方向键序列; 50ms 内无后续字符则忽略(单独 ESC)'''
+        try:
+            poll = select.poll()
+            poll.register(sys.stdin, select.POLLIN)
+            if not poll.poll(50):
+                return
+            seq = sys.stdin.read(2)
+        except Exception:
+            return
+        if seq == '[A':
+            self._hist_up()
+        elif seq == '[B':
+            self._hist_down()

@@ -7,8 +7,8 @@ import sys
 import json
 import select
 
-# APP 目录挂到 sys.path, 使 "import app.rpc.server" 可用
-sys.path.insert(0, '/APP')
+# APP 包根挂到 sys.path, 使 "import app.rpc.server" 可用
+sys.path.insert(0, '/')
 
 from app.rpc.server import RPCServer, RPCControl
 from app.cli import Shell
@@ -75,7 +75,7 @@ def drain_stdin():
 def main():
     # 读配置
     try:
-        with open('/APP/app/confighw_profile.json', 'r') as f:
+        with open('/app/confighw_profile.json', 'r') as f:
             profile = json.load(f)
     except Exception as e:
         print('config load failed: {0}'.format(e))
