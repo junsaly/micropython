@@ -1,13 +1,17 @@
 # Pico2 入口: 读 confighw_profile.json 装配驱动并启动 RPC Server
 # 协议: MIX_2.0 JSON-RPC, USB CDC 串口, 一行一个请求
+# 模式: 上电默认 RPC; RPC 内调 rpc.stop 退出到 shell; shell 内 run rpc 回 RPC;
+#       任意模式 Ctrl+C 退出到 MicroPython REPL
 
 import sys
 import json
+import select
 
 # APP 目录挂到 sys.path, 使 "import app.rpc.server" 可用
 sys.path.insert(0, '/APP')
 
-from app.rpc.server import RPCServer
+from app.rpc.server import RPCServer, RPCControl
+from app.cli import Shell
 from app.driver.ic.ad7175 import PLAD7175
 from app.driver.module.dmm import PRM_DMM, MockAD7175
 
@@ -57,6 +61,17 @@ def create_dut_instances(profile, devices):
 
 # ---------- 主流程 ----------
 
+def drain_stdin():
+    '''清空串口输入缓冲 (切换模式时避免残留字符干扰)'''
+    try:
+        poll = select.poll()
+        poll.register(sys.stdin, select.POLLIN)
+        while poll.poll(0):
+            sys.stdin.read(1)
+    except Exception:
+        pass
+
+
 def main():
     # 读配置
     try:
@@ -70,12 +85,29 @@ def main():
     shared = create_shared_devices(profile)
     dut_objs = create_dut_instances(profile, shared)
 
-    # 启动 RPC Server 并注册实例 (方法名: "dmm.measure")
+    # RPC Server: 注册驱动实例 (dmm.xxx) + 控制实例 (rpc.stop)
     server = RPCServer()
     server.register_instance(dut_objs)
+    server.register_instance({'rpc': RPCControl(server)})
+
+    # Shell: eval 上下文暴露常用符号, run rpc 回调重新进 RPC
+    ctx = {'dmm': dut_objs.get('dmm'), 'server': server, 'machine': None}
+    shell = Shell(context=ctx)
 
     print('registered methods: {0}'.format(json.dumps(server.all_methods())))
-    server.run()
+
+    # 三层主循环: RPC <-> Shell, Ctrl+C 退出到 REPL
+    try:
+        while True:
+            try:
+                server.run()
+            except KeyboardInterrupt:
+                raise
+            # rpc.stop -> 退出 RPC, 进 shell
+            drain_stdin()
+            shell.run()
+    except KeyboardInterrupt:
+        print('\r\n[Ctrl+C] back to MicroPython REPL.')
 
 
 main()

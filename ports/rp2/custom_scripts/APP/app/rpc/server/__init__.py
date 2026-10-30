@@ -8,6 +8,17 @@ from app.rpc.protocols.jsonrpc import JSONRPCProtocol
 from app.rpc.dispatch import RPCDispatcher
 
 
+class RPCControl(object):
+    '''rpc 控制实例: 通过 rpc.stop 停止服务并退出到 shell'''
+
+    def __init__(self, server):
+        self._server = server
+
+    def stop(self):
+        self._server.shut_down()
+        return 'done'
+
+
 class RPCServer(object):
     '''RPC Server: 从串口读一行 JSON 请求, 分发, 回一行 JSON'''
 
