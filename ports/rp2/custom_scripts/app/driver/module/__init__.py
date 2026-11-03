@@ -1,1 +1,1 @@
-from app.driver.module.dmm import PRM_DMM, DmmDef, DMMException
+from app.driver.module.dmm import DMM, DmmDef, DMMException

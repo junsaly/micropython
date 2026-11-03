@@ -2,19 +2,19 @@
 	"shared_devices": {
 		"ad7175_spi": {
 			"class": "PLAD7175",
-			"sck": 2,
-			"mosi": 3,
-			"miso": 4,
-			"cs": 5,
+			"sck": 18,
+			"mosi": 19,
+			"miso": 16,
+			"cs": 17,
 			"freq": 5000000,
 			"mvref": 5000,
-			"mock": true
+			"mock": false
 		}
 	},
 	"duts": {
 		"dut0": {
 			"dmm": {
-				"class": "PRM_DMM",
+				"class": "DMM",
 				"ad7175": "@ad7175_spi"
 			},
 			"site": 0,

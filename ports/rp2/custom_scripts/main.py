@@ -1,6 +1,6 @@
 # Pico2 入口: 读 confighw_profile.json 装配驱动并启动 RPC Server
 # 协议: MIX_2.0 JSON-RPC, USB CDC 串口, 一行一个请求
-# 模式: 上电默认 RPC; RPC 内调 rpc.stop 退出到 shell; shell 内 run rpc 回 RPC;
+# 模式: 上电默认 RPC; RPC 内调 rpc.stop 退出到 shell; shell 内 run rpc 回 RPC; {"version":"MIX_2.0","id":1,"remote_id":"rpc","method":"rpc.stop"}
 #       任意模式 Ctrl+C 退出到 MicroPython REPL
 
 import sys
@@ -13,7 +13,7 @@ sys.path.insert(0, '/')
 from app.rpc.server import RPCServer, RPCControl
 from app.cli import Shell
 from app.driver.ic.ad7175 import PLAD7175
-from app.driver.module.dmm import PRM_DMM, MockAD7175
+from app.driver.module.dmm import DMM, MockAD7175
 
 
 # ---------- 配置装配 (对齐 STM32 launcher 思路) ----------
@@ -53,9 +53,9 @@ def create_dut_instances(profile, devices):
             if not isinstance(cfg, dict) or 'class' not in cfg:
                 continue
             cls = cfg['class']
-            if cls == 'PRM_DMM':
+            if cls == 'DMM':
                 adc = resolve_ref(cfg.get('ad7175'), devices)
-                objs[name] = PRM_DMM(ad7175=adc)
+                objs[name] = DMM(ad7175=adc)
     return objs
 
 

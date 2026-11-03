@@ -43,6 +43,8 @@ class RPCServer(object):
         stream_out = stream_out or sys.stdout
         self.serving = True
         print('{0} RPC server ready'.format(self._identity))
+        print('  stop RPC: {"version":"MIX_2.0","id":1,"remote_id":"rpc","method":"rpc.stop"}')
+        print('  Ctrl+C: back to MicroPython REPL')
         while self.serving:
             line = stream_in.readline()
             if not line:

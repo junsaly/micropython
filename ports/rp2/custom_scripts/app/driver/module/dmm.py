@@ -1,5 +1,5 @@
 # app/driver/module/dmm.py  DMM 数字万用表模块驱动
-# 对齐 STM32 版 mix/driver/module/dmm.py 的 PRM_DMM API
+# 对齐 STM32 版 mix/driver/module/dmm.py 的 DMM API
 # Pico 版: AD7175 + 板载 IO (无 cat9555/eeprom 时降级为纯 AD7175 测量)
 
 import time
@@ -35,7 +35,7 @@ class DMMException(Exception):
         return 'DMMException: %s' % self.err_str
 
 
-class PRM_DMM(object):
+class DMM(object):
     '''DMM 数字万用表模块, 基于 AD7175'''
 
     rpc_public_api = [
