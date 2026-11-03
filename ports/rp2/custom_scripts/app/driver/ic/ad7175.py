@@ -105,9 +105,12 @@ class PLAD7175(object):
             self.cs.value(0)
 
     def _transfer(self, tx):
+        '''SPI 传输: 写 tx 同时读回等长数据 (此固件 SPI.read 不支持 buffer 参数)'''
         self.cs_low()
         try:
-            return self.spi.read(len(tx), tx)
+            rx = bytearray(len(tx))
+            self.spi.write_readinto(tx, rx)
+            return bytes(rx)
         finally:
             self.cs_high()
 
