@@ -9,7 +9,10 @@ __version__ = 'v0.1'
 
 
 class AD717XDef:
-    AD7175_CHIP_ID = 0x0DC2
+    # ADI no-OS: AD7175-2 ID=0x0CD0, AD7175-8 ID=0x3CD0; 高 12 位 0x0CD
+    AD7175_CHIP_ID = 0x0CD0
+    ID_REG_MASK = 0xFFF0
+    AD7175_ID_HIGH = 0x0CD0
 
     # 采样率配置表 (sps -> FILTER 寄存器值)
     SAMPLING_CONFIG_TABLE_AD7175 = {
@@ -139,10 +142,10 @@ class PLAD7175(object):
         return 'done'
 
     def reset(self):
-        # AD7175 需要至少 64 个 DIN=1 周期触发复位
+        # AD7175 需要至少 64 个 DIN=1 周期触发复位 (原版 12 字节)
         self.cs_low()
         try:
-            self.spi.write(bytes([0xFF]) * 8)
+            self.spi.write(bytes([0xFF]) * 12)
         finally:
             self.cs_high()
         time.sleep_ms(10)
@@ -179,6 +182,7 @@ class PLAD7175(object):
         try:
             reg_data = self.read_register(AD717XDef.ID_REG_ADDR, 2)
             chip_id = (reg_data[0] << 8) | reg_data[1]
-            return chip_id == AD717XDef.AD7175_CHIP_ID
+            # 兼容 AD7175-2(0x0CD0) / AD7175-8(0x3CD0)
+            return (chip_id & AD717XDef.ID_REG_MASK) in (0x0CD0, 0x3CD0)
         except Exception:
             return False
